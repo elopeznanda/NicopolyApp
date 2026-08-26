@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">Nicopoly</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_home">Inicio</string>
+    <string name="nav_catalog">Catálogo</string>
+    <string name="nav_profile">Perfil</string>
+
+    <!-- Splash -->
+    <string name="splash_loading">Cargando Nicopoly…</string>
+
+    <!-- Home -->
+    <string name="home_greeting">Bienvenid@ a</string>
+    <string name="home_app_title">Nicopoly</string>
+    <string name="home_subtitle">Tu estilo, tu mundo</string>
+    <string name="home_featured">✨ Productos Destacados</string>
+    <string name="home_new_arrivals">🆕 Recién Llegados</string>
+    <string name="home_categories">📂 Categorías</string>
+    <string name="home_error">No se pudieron cargar los productos. Intenta de nuevo.</string>
+
+    <!-- Catalog -->
+    <string name="catalog_title">Catálogo</string>
+    <string name="catalog_search_hint">Buscar productos…</string>
+    <string name="catalog_no_results">No se encontraron productos</string>
+    <string name="catalog_no_results_subtitle">Intenta con otra búsqueda o categoría</string>
+    <string name="catalog_error">No se pudieron cargar los productos del catálogo.</string>
+    <string name="catalog_all">Todos</string>
+
+    <!-- Product -->
+    <string name="product_price">Precio</string>
+    <string name="product_rating">Calificación</string>
+    <string name="product_reviews">%1$d reseñas</string>
+    <string name="product_new">Nuevo</string>
+    <string name="product_featured">Destacado</string>
+    <string name="product_sale">Oferta</string>
+    <string name="product_discount">-%1$d%%</string>
+
+    <!-- Profile -->
+    <string name="profile_title">Perfil</string>
+    <string name="profile_coming_soon">Próximamente</string>
+    <string name="profile_description">Esta sección estará disponible en la próxima versión.</string>
+
+    <!-- General -->
+    <string name="loading">Cargando…</string>
+    <string name="error_retry">Intentar de nuevo</string>
+    <string name="products_count">%1$d productos</string>
+</resources>
