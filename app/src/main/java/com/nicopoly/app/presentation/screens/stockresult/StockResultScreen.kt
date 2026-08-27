@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Category
@@ -370,69 +372,7 @@ private fun WholesaleCard(precioMayor: Double) {
     }
 }
 
-/**
- * Tabla de stock con todas las variantes del código padre.
- */
-@Composable
-private fun StockTable(variantes: List<com.nicopoly.app.domain.model.VarianteStock>) {
-    ResultCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            CardHeader(icon = Icons.Default.Inventory2, label = "STOCKS")
-
-            // Encabezado de la tabla
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "SKU",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(2f),
-                    textAlign = TextAlign.Start
-                )
-                StockColumnHeader("BODEGA")
-                StockColumnHeader("P1")
-                StockColumnHeader("F")
-                StockColumnHeader("P2")
-            }
-
-            // Filas de variantes con líneas separadoras horizontales entre tiendas
-            variantes.forEachIndexed { index, variante ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = variante.codigoHijo,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(2f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    StockCell(variante.stockBodega)
-                    StockCell(variante.stockProvi1)
-                    StockCell(variante.stockFilomena)
-                    StockCell(variante.stockProvi2)
-                }
-                if (index < variantes.lastIndex) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(0.5.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                    )
-                }
-            }
-        }
-    }
-}
+// Remove StockTable function, it will be inlined in FullResultState
 
 /**
  * Encabezado de columna de stock.
@@ -500,6 +440,7 @@ private fun convertTemporada(temporada: String): String {
 /**
  * Pantalla completa de resultado.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FullResultState(
     result: com.nicopoly.app.domain.model.StockResultFull,
@@ -507,7 +448,6 @@ private fun FullResultState(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(vertical = 12.dp)
     ) {
         // Encabezado: código padre + chip de temporada
@@ -535,24 +475,114 @@ private fun FullResultState(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
             LocationCard(ubicacion = result.ubicacion)
+            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
             OnlineCard(t060Total = result.t060Total, casaMatrizTotal = result.casaMatrizTotal)
+            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
             CategoryCard(categoria = result.categoria)
+            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
             PricesCard(precioTiendas = result.precioTiendas, precioInicial = result.precioInicial)
+            Spacer(modifier = Modifier.height(10.dp))
         }
         item {
             WholesaleCard(precioMayor = result.precioMayor)
+            Spacer(modifier = Modifier.height(10.dp))
         }
-        item {
-            StockTable(result.variantes)
+
+        stickyHeader {
+            androidx.compose.material3.Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
+                elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 1.dp),
+                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            ) {
+                Column(modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 8.dp)) {
+                    CardHeader(icon = Icons.Default.Inventory2, label = "STOCKS")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "SKU",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(2f),
+                            textAlign = TextAlign.Start
+                        )
+                        StockColumnHeader("BODEGA")
+                        StockColumnHeader("P1")
+                        StockColumnHeader("F")
+                        StockColumnHeader("P2")
+                    }
+                }
+            }
+        }
+
+        itemsIndexed(result.variantes) { index, variante ->
+            val isLast = index == result.variantes.lastIndex
+            val shape = if (isLast) {
+                RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
+            } else {
+                androidx.compose.ui.graphics.RectangleShape
+            }
+
+            androidx.compose.material3.Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = shape,
+                elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 1.dp),
+                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = variante.codigoHijo,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(2f),
+                            maxLines = 1,
+                            textDecoration = null,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        StockCell(variante.stockBodega)
+                        StockCell(variante.stockProvi1)
+                        StockCell(variante.stockFilomena)
+                        StockCell(variante.stockProvi2)
+                    }
+                    if (!isLast) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(0.5.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(14.dp)) // padding bottom for the last card part
+                    }
+                }
+            }
         }
     }
 }

@@ -319,78 +319,88 @@ class ExcelImporter @Inject constructor(
         return try {
             onProgress?.invoke(5, "Conectando a Google Sheets...")
 
-            // Llamar al nuevo servicio
-            val values = googleSheetsService.fetchSheetData()
+            // Llamar al nuevo servicio (descarga ambas pestañas)
+            val sheetData = googleSheetsService.fetchSheetData()
+            val reposicionValues = sheetData.reposicionRows
+            val ubicacionesValues = sheetData.ubicacionesRows
 
-            if (values.isNullOrEmpty() || values.size <= 1) { // Menos de 1 significa solo cabecera o vacío
-                Log.e(TAG, "No se recibieron datos de Google Sheets o está vacía")
+            if (reposicionValues.size <= 1) {
+                Log.e(TAG, "No se recibieron datos de productos en la hoja 'Reposicion'")
                 return ExcelImportStats(
-                    summaryMessage = "ERROR: No se encontraron datos en la hoja de cálculo"
+                    summaryMessage = "ERROR: No se encontraron datos en la hoja 'Reposicion'"
                 )
             }
 
-            Log.i(TAG, "Datos recibidos: ${values.size - 1} filas de productos (excluyendo cabecera).")
-            onProgress?.invoke(30, "Procesando ${values.size - 1} productos...")
+            Log.i(TAG, "Datos recibidos: ${reposicionValues.size - 1} productos, ${ubicacionesValues.size - 1} ubicaciones.")
+            onProgress?.invoke(20, "Procesando ubicaciones...")
 
+            // 1. Procesar pestaña 'Ubicaciones'
+            val ubicacionesMap = mutableMapOf<String, String>()
+            for (i in 1 until ubicacionesValues.size) {
+                val row = ubicacionesValues[i]
+                val itemCode = row.getOrNull(0)?.toString()?.trim().orEmpty()
+                val padreColor = row.getOrNull(1)?.toString()?.trim().orEmpty()
+                val ubi = row.getOrNull(2)?.toString()?.trim().orEmpty()
+
+                if (ubi.isNotEmpty()) {
+                    if (padreColor.isNotEmpty()) {
+                        ubicacionesMap[padreColor] = ubi
+                    }
+                    if (itemCode.isNotEmpty()) {
+                        val (codigoPadre, _) = parseCodigoHijoFromAPI(itemCode)
+                        if (codigoPadre.isNotEmpty() && !ubicacionesMap.containsKey(codigoPadre)) {
+                            ubicacionesMap[codigoPadre] = ubi
+                        }
+                    }
+                }
+            }
+
+            onProgress?.invoke(35, "Procesando ${reposicionValues.size - 1} productos...")
+
+            // 2. Procesar pestaña 'Reposicion'
             val productos = mutableListOf<ProductoEntity>()
-            val ubicacionesList = mutableListOf<UbicacionEntity>()
 
-            // Saltar la cabecera (índice 0)
-            for (i in 1 until values.size) {
-                val row = values[i]
+            for (i in 1 until reposicionValues.size) {
+                val row = reposicionValues[i]
                 
-                // Extraer el ItemCode (Columna 0)
                 val itemCodeRaw = row.getOrNull(0)?.toString()?.trim()
                 if (itemCodeRaw.isNullOrEmpty()) continue
 
                 val (codigoPadre, color) = parseCodigoHijoFromAPI(itemCodeRaw)
 
-                // Helpers para extraer texto y números de las celdas
-                fun getStr(idx: Int): String = row.getOrNull(idx)?.toString()?.trim() ?: ""
-                fun getNum(idx: Int): Int {
-                    val strVal = getStr(idx)
-                    return strVal.toDoubleOrNull()?.toInt() ?: 0
-                }
-                fun getDouble(idx: Int): Double {
-                    val strVal = getStr(idx)
-                    return strVal.toDoubleOrNull() ?: 0.0
-                }
+                fun getStr(idx: Int): String = row.getOrNull(idx)?.toString()?.trim().orEmpty()
+                fun getNum(idx: Int): Int = getStr(idx).toDoubleOrNull()?.toInt() ?: 0
+                fun getDouble(idx: Int): Double = getStr(idx).toDoubleOrNull() ?: 0.0
 
                 val producto = ProductoEntity(
                     codigoHijo = itemCodeRaw,
                     codigoPadre = codigoPadre,
                     color = color,
                     talla = "",
-                    categoria = getStr(2), // Categoria
-                    temporada = getStr(3), // Temporada
-                    stockProvi1 = getNum(4), // T003
-                    stockFilomena = getNum(5), // T009
-                    stockProvi2 = getNum(6), // T012
-                    // T001 is col 7 (ignored in entity or mapped? Actually T001 wasn't mapped in old code either, wait. Old code didn't map T001 to Room.)
-                    t060 = getNum(8), // T060
-                    // T011 is col 9 (wait, old code mapped stockFilomena=t009 or t011? Old code mapped stockFilomena = apiItem.t009. Wait, in RoomStockRepository it used stockFilomena for t011 Total. Let's keep old mapping)
-                    stockBodega = getNum(10), // Casa Matriz
-                    precioTiendas = getDouble(11), // Precio Rec2
-                    precioInicial = getDouble(12), // Precio Base
-                    precioMayor = getDouble(13) // Precio Mayor
+                    categoria = getStr(2),
+                    temporada = getStr(3),
+                    stockProvi1 = getNum(4),
+                    stockFilomena = getNum(5),
+                    stockProvi2 = getNum(6),
+                    t060 = getNum(8),
+                    stockBodega = getNum(10),
+                    precioTiendas = getDouble(11),
+                    precioInicial = getDouble(12),
+                    precioMayor = getDouble(13)
                 )
 
                 productos.add(producto)
 
-                val ubicacion = getStr(15) // Ubicacion
-                if (ubicacion.isNotEmpty()) {
-                    ubicacionesList.add(
-                        UbicacionEntity(
-                            codigoPadre = codigoPadre,
-                            ubicacion = ubicacion
-                        )
-                    )
+                // Si la columna 15 de Reposición tiene ubicación y no estaba en la pestaña Ubicaciones, complementarla
+                val ubiRep = getStr(15)
+                if (ubiRep.isNotEmpty() && !ubicacionesMap.containsKey(codigoPadre)) {
+                    ubicacionesMap[codigoPadre] = ubiRep
                 }
             }
 
             onProgress?.invoke(50, "Preparando base de datos...")
 
-            // Reemplazar datos en Room dentro de transacción atómica
+            // 3. Reemplazar datos en Room dentro de transacción atómica
             database.withTransaction {
                 database.productoDao().deleteAllProductos()
                 database.ubicacionDao().deleteAllUbicaciones()
@@ -403,19 +413,18 @@ class ExcelImporter @Inject constructor(
                     onProgress?.invoke(progress, "Guardando productos...")
                 }
 
-                if (ubicacionesList.isNotEmpty()) {
-                    onProgress?.invoke(95, "Guardando ubicaciones...")
-                    // Evitar duplicados agrupando por código padre y tomando la última ubicación
-                    val ubicacionesMap = ubicacionesList.associateBy({ it.codigoPadre }, { it.ubicacion })
+                if (ubicacionesMap.isNotEmpty()) {
+                    onProgress?.invoke(95, "Guardando ubicaciones (${ubicacionesMap.size})...")
                     insertUbicacionesBatch(ubicacionesMap)
                 }
             }
 
             val stats = ExcelImportStats(
-                totalDataRowsRead = values.size - 1,
+                totalDataRowsRead = reposicionValues.size - 1,
+                totalUbicacionRowsRead = ubicacionesMap.size,
                 productosInserted = productos.size,
-                ubicacionesInserted = ubicacionesList.size,
-                summaryMessage = "Google Sheets: ${productos.size} productos actualizados"
+                ubicacionesInserted = ubicacionesMap.size,
+                summaryMessage = "Google Sheets: ${productos.size} productos y ${ubicacionesMap.size} ubicaciones actualizadas"
             )
 
             Log.i(TAG, stats.toString())

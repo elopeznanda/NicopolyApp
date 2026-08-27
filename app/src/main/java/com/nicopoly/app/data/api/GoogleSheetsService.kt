@@ -1,4 +1,4 @@
-﻿package com.nicopoly.app.data.api
+package com.nicopoly.app.data.api
 
 import android.content.Context
 import android.util.Log
@@ -15,6 +15,11 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class GoogleSheetsData(
+    val reposicionRows: List<List<Any>>,
+    val ubicacionesRows: List<List<Any>>
+)
+
 @Singleton
 class GoogleSheetsService @Inject constructor(
     @ApplicationContext private val context: Context
@@ -23,14 +28,14 @@ class GoogleSheetsService @Inject constructor(
         private const val TAG = "GoogleSheetsService"
         private const val APPLICATION_NAME = "NicopolyApp"
         private const val SPREADSHEET_ID = "1WKP6-EMvt2uhlXLXzlvR7u8dvKaXu-3ukr_GxbHxZno"
-        private const val RANGE = "Reposición General!A:P"
+        private const val RANGE_REPOSICION = "Reposicion!A:P"
+        private const val RANGE_UBICACIONES = "Ubicaciones!A:C"
     }
 
     /**
-     * Obtiene los datos de la hoja de cálculo usando la cuenta de servicio.
-     * Retorna una lista de listas de objetos, donde cada lista interna representa una fila.
+     * Obtiene los datos de ambas hojas (Reposición y Ubicaciones) usando la cuenta de servicio.
      */
-    suspend fun fetchSheetData(): List<List<Any>>? = withContext(Dispatchers.IO) {
+    suspend fun fetchSheetData(): GoogleSheetsData = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Iniciando autenticación con cuenta de servicio...")
             
@@ -49,22 +54,23 @@ class GoogleSheetsService @Inject constructor(
                 .setApplicationName(APPLICATION_NAME)
                 .build()
                 
-            Log.d(TAG, "Conectando a Google Sheets API...")
+            Log.d(TAG, "Conectando a Google Sheets API (batchGet para Reposicion y Ubicaciones)...")
             
-            // 3. Consultar la hoja de cálculo
-            val response = service.spreadsheets().values()
-                .get(SPREADSHEET_ID, RANGE)
+            // 3. Consultar ambas hojas en una sola llamada de red
+            val batchResponse = service.spreadsheets().values()
+                .batchGet(SPREADSHEET_ID)
+                .setRanges(listOf(RANGE_REPOSICION, RANGE_UBICACIONES))
                 .execute()
                 
-            val values = response.getValues()
+            val valueRanges = batchResponse.valueRanges
+            val reposicionValues = valueRanges?.getOrNull(0)?.getValues() ?: emptyList()
+            val ubicacionesValues = valueRanges?.getOrNull(1)?.getValues() ?: emptyList()
             
-            if (values == null || values.isEmpty()) {
-                Log.w(TAG, "No se encontraron datos en la hoja de cálculo.")
-                return@withContext null
-            }
-            
-            Log.d(TAG, "Se descargaron ${values.size} filas exitosamente.")
-            return@withContext values
+            Log.d(TAG, "Se descargaron ${reposicionValues.size} filas de Reposición y ${ubicacionesValues.size} filas de Ubicaciones.")
+            return@withContext GoogleSheetsData(
+                reposicionRows = reposicionValues,
+                ubicacionesRows = ubicacionesValues
+            )
             
         } catch (e: Exception) {
             Log.e(TAG, "Error al obtener datos de Google Sheets", e)
