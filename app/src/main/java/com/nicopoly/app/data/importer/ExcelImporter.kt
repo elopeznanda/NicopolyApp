@@ -6,26 +6,22 @@ import androidx.room.withTransaction
 import com.nicopoly.app.data.local.NicopolyDatabase
 import com.nicopoly.app.data.local.entity.ProductoEntity
 import com.nicopoly.app.data.local.entity.UbicacionEntity
+import com.nicopoly.app.data.api.GoogleSheetsService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Importador de datos desde Excel a la base de datos Room.
- *
- * Lee el archivo DATOS.xlsx desde assets y procesa ambas hojas:
- * - DATOS: 32,776 registros de productos/variantes
- * - UBICACIONES: 1,619 registros de ubicación por código padre
- *
- * El diseño permite reemplazar esta implementación por una que lea de SAP/API
- * sin modificar la UI ni el Repository.
+ * Importador de datos desde Excel y Google Sheets a la base de datos Room.
  *
  * @param database Base de datos Room inyectada vía Hilt.
+ * @param googleSheetsService Servicio de Google Sheets para conexión directa.
  * @param context Contexto de la aplicación para acceder a assets.
  */
 @Singleton
 class ExcelImporter @Inject constructor(
     private val database: NicopolyDatabase,
+    private val googleSheetsService: GoogleSheetsService,
     @ApplicationContext private val context: Context
 ) {
 
@@ -309,85 +305,84 @@ class ExcelImporter @Inject constructor(
     )
 
     /**
-     * Método para obtener datos desde una API HTTP JSON de Google Apps Script.
+     * Método para obtener datos directamente desde la API V4 de Google Sheets.
      *
-     * Conecta a la API remota, descarga los datos de reposición en formato JSON,
-     * los mapea a ProductoEntity y UbicacionEntity, y los almacena en Room.
+     * Utiliza GoogleSheetsService para conectarse a la hoja privada usando
+     * la cuenta de servicio, descarga los datos, los mapea y los guarda en Room.
      *
-     * Sigue el mismo patrón que importFromStream:
-     * - Borra datos anteriores antes de insertar nuevos
-     * - Usa transacción atómica para garantizar consistencia
-     * - Retorna estadísticas detalladas del proceso
-     * - Maneja errores de red sin afectar los datos existentes en Room
-     *
-     * @param url URL de la API (se ignora, se usa la URL configurada).
      * @param onProgress Callback opcional para reportar progreso.
      * @return Estadísticas detalladas del proceso de importación.
      */
-    suspend fun importFromAPI(url: String, onProgress: ((Int, String) -> Unit)? = null): ExcelImportStats {
-        Log.i(TAG, "════ Iniciando importación desde API ════")
+    suspend fun importFromGoogleSheets(onProgress: ((Int, String) -> Unit)? = null): ExcelImportStats {
+        Log.i(TAG, "════ Iniciando importación directa desde Google Sheets ════")
 
         return try {
-            // Progreso inicial
-            onProgress?.invoke(5, "Actualizando")
+            onProgress?.invoke(5, "Conectando a Google Sheets...")
 
-            // Llamar a la API de Google Apps Script mediante Retrofit
-            val apiService = com.nicopoly.app.data.api.ApiClient.createService()
-            val response = apiService.getStockData()
+            // Llamar al nuevo servicio
+            val values = googleSheetsService.fetchSheetData()
 
-            if (!response.success) {
-                Log.e(TAG, "API devolvió success=false")
+            if (values.isNullOrEmpty() || values.size <= 1) { // Menos de 1 significa solo cabecera o vacío
+                Log.e(TAG, "No se recibieron datos de Google Sheets o está vacía")
                 return ExcelImportStats(
-                    summaryMessage = "ERROR: La API no pudo devolver los datos correctamente"
+                    summaryMessage = "ERROR: No se encontraron datos en la hoja de cálculo"
                 )
             }
 
-            val reposicionItems = response.reposicion
-            if (reposicionItems.isEmpty()) {
-                Log.e(TAG, "API devolvió lista vacía de reposición")
-                return ExcelImportStats(
-                    summaryMessage = "ERROR: No se recibieron datos de la API"
-                )
-            }
+            Log.i(TAG, "Datos recibidos: ${values.size - 1} filas de productos (excluyendo cabecera).")
+            onProgress?.invoke(30, "Procesando ${values.size - 1} productos...")
 
-            Log.i(TAG, "Datos recibidos desde API: ${reposicionItems.size} items en '${response.spreadsheet}'")
-            onProgress?.invoke(30, "Procesando ${reposicionItems.size} productos...")
-
-            // Mapear ReposicionItem → ProductoEntity + UbicacionEntity
             val productos = mutableListOf<ProductoEntity>()
             val ubicacionesList = mutableListOf<UbicacionEntity>()
 
-            for (apiItem in reposicionItems) {
-                // El Item de la API contiene el código hijo completo, ej: "N06182AM".
-                // Se deriva codigoPadre, color y talla con la misma lógica que el Excel.
-                val itemCode = apiItem.item.toString()
-                val (codigoPadre, color) = parseCodigoHijoFromAPI(itemCode)
+            // Saltar la cabecera (índice 0)
+            for (i in 1 until values.size) {
+                val row = values[i]
+                
+                // Extraer el ItemCode (Columna 0)
+                val itemCodeRaw = row.getOrNull(0)?.toString()?.trim()
+                if (itemCodeRaw.isNullOrEmpty()) continue
+
+                val (codigoPadre, color) = parseCodigoHijoFromAPI(itemCodeRaw)
+
+                // Helpers para extraer texto y números de las celdas
+                fun getStr(idx: Int): String = row.getOrNull(idx)?.toString()?.trim() ?: ""
+                fun getNum(idx: Int): Int {
+                    val strVal = getStr(idx)
+                    return strVal.toDoubleOrNull()?.toInt() ?: 0
+                }
+                fun getDouble(idx: Int): Double {
+                    val strVal = getStr(idx)
+                    return strVal.toDoubleOrNull() ?: 0.0
+                }
 
                 val producto = ProductoEntity(
-                    codigoHijo = itemCode,
+                    codigoHijo = itemCodeRaw,
                     codigoPadre = codigoPadre,
                     color = color,
                     talla = "",
-                    categoria = apiItem.categoria.ifEmpty { "" },
-                    temporada = apiItem.temporada ?: "",
-                    stockBodega = apiItem.casaMatriz,
-                    stockProvi1 = apiItem.t003,
-                    stockFilomena = apiItem.t009,
-                    stockProvi2 = apiItem.t012,
-                    t060 = apiItem.t060,
-                    precioTiendas = apiItem.precioRec2.toDouble(),
-                    precioInicial = apiItem.precioBase.toDouble(),
-                    precioMayor = apiItem.precioMayor.toDouble()
+                    categoria = getStr(2), // Categoria
+                    temporada = getStr(3), // Temporada
+                    stockProvi1 = getNum(4), // T003
+                    stockFilomena = getNum(5), // T009
+                    stockProvi2 = getNum(6), // T012
+                    // T001 is col 7 (ignored in entity or mapped? Actually T001 wasn't mapped in old code either, wait. Old code didn't map T001 to Room.)
+                    t060 = getNum(8), // T060
+                    // T011 is col 9 (wait, old code mapped stockFilomena=t009 or t011? Old code mapped stockFilomena = apiItem.t009. Wait, in RoomStockRepository it used stockFilomena for t011 Total. Let's keep old mapping)
+                    stockBodega = getNum(10), // Casa Matriz
+                    precioTiendas = getDouble(11), // Precio Rec2
+                    precioInicial = getDouble(12), // Precio Base
+                    precioMayor = getDouble(13) // Precio Mayor
                 )
 
                 productos.add(producto)
 
-                // Si la API proporciona ubicación para este item, almacenarla usando el codigoPadre derivado
-                if (!apiItem.ubicacion.isNullOrEmpty()) {
+                val ubicacion = getStr(15) // Ubicacion
+                if (ubicacion.isNotEmpty()) {
                     ubicacionesList.add(
                         UbicacionEntity(
                             codigoPadre = codigoPadre,
-                            ubicacion = apiItem.ubicacion
+                            ubicacion = ubicacion
                         )
                     )
                 }
@@ -395,13 +390,11 @@ class ExcelImporter @Inject constructor(
 
             onProgress?.invoke(50, "Preparando base de datos...")
 
-            // Reemplazar datos en Room dentro de transacción atómica (igual que Excel)
+            // Reemplazar datos en Room dentro de transacción atómica
             database.withTransaction {
-                // Borrar datos anteriores
                 database.productoDao().deleteAllProductos()
                 database.ubicacionDao().deleteAllUbicaciones()
 
-                // Insertar nuevos datos por lotes
                 onProgress?.invoke(60, "Guardando productos...")
                 val batches = productos.chunked(BATCH_SIZE)
                 for ((index, batch) in batches.withIndex()) {
@@ -410,51 +403,27 @@ class ExcelImporter @Inject constructor(
                     onProgress?.invoke(progress, "Guardando productos...")
                 }
 
-                // Insertar ubicaciones
                 if (ubicacionesList.isNotEmpty()) {
                     onProgress?.invoke(95, "Guardando ubicaciones...")
-                    insertUbicacionesBatch(ubicacionesList.associateBy({ it.codigoPadre }, { it.ubicacion }))
+                    // Evitar duplicados agrupando por código padre y tomando la última ubicación
+                    val ubicacionesMap = ubicacionesList.associateBy({ it.codigoPadre }, { it.ubicacion })
+                    insertUbicacionesBatch(ubicacionesMap)
                 }
             }
 
             val stats = ExcelImportStats(
-                totalDataRowsRead = reposicionItems.size,
+                totalDataRowsRead = values.size - 1,
                 productosInserted = productos.size,
                 ubicacionesInserted = ubicacionesList.size,
-                summaryMessage = "API: ${response.spreadsheet} - ${productos.size} productos actualizados"
+                summaryMessage = "Google Sheets: ${productos.size} productos actualizados"
             )
 
             Log.i(TAG, stats.toString())
             onProgress?.invoke(100, "Completado")
             stats
 
-        } catch (e: retrofit2.HttpException) {
-            Log.e(TAG, "ERROR HTTP desde API", e)
-            ExcelImportStats(
-                summaryMessage = "ERROR de conexión (${e.code()}): No se pudo obtener datos"
-            )
-        } catch (e: java.net.ConnectException) {
-            Log.e(TAG, "ERROR de conexión a la red", e)
-            ExcelImportStats(
-                summaryMessage = "ERROR: No hay conexión a Internet disponible"
-            )
-        } catch (e: java.net.UnknownHostException) {
-            Log.e(TAG, "ERROR: host desconocido", e)
-            ExcelImportStats(
-                summaryMessage = "ERROR: No se pudo resolver el servidor"
-            )
-        } catch (e: com.google.gson.JsonParseException) {
-            Log.e(TAG, "ERROR parseando respuesta JSON", e)
-            ExcelImportStats(
-                summaryMessage = "ERROR: Respuesta de la API no es válida"
-            )
-        } catch (e: java.io.InterruptedIOException) {
-            Log.e(TAG, "ERROR: tiempo de espera agotado", e)
-            ExcelImportStats(
-                summaryMessage = "ERROR: Tiempo de espera de conexión agotado"
-            )
         } catch (e: Exception) {
-            Log.e(TAG, "ERROR general durante importación desde API", e)
+            Log.e(TAG, "ERROR general durante importación desde Google Sheets", e)
             ExcelImportStats(
                 summaryMessage = "ERROR: ${e.message ?: e.javaClass.simpleName}"
             )

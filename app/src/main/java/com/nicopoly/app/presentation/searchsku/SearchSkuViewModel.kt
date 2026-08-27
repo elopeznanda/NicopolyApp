@@ -219,7 +219,7 @@ class SearchSkuViewModel @Inject constructor(
             try {
                 // Ejecutar la importación desde API en IO con callback de progreso
                 val stats = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    excelImporter.importFromAPI("", onProgress = { progress, stage ->
+                    excelImporter.importFromGoogleSheets(onProgress = { progress, stage ->
                         _uiState.value = _uiState.value.copy(
                             isImporting = true,
                             importProgress = progress,

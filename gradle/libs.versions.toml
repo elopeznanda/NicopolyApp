@@ -18,6 +18,9 @@ coil = "2.5.0"
 material3 = "1.2.1"
 poi = "5.2.3"
 datastore = "1.0.0"
+googleApiClient = "2.2.0"
+googleApiServicesSheets = "v4-rev20220927-2.0.0"
+googleAuthLibrary = "1.19.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -53,6 +56,9 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 poi-ooxml = { group = "org.apache.poi", name = "poi-ooxml", version.ref = "poi" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+google-api-client-android = { group = "com.google.api-client", name = "google-api-client-android", version.ref = "googleApiClient" }
+google-api-services-sheets = { group = "com.google.apis", name = "google-api-services-sheets", version.ref = "googleApiServicesSheets" }
+google-auth-library-oauth2-http = { group = "com.google.auth", name = "google-auth-library-oauth2-http", version.ref = "googleAuthLibrary" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

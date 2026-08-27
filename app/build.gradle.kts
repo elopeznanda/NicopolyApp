@@ -57,7 +57,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "/META-INF/DEPENDENCIES"
             excludes += "/META-INF/LICENSE"
+            excludes += "/META-INF/LICENSE.txt"
+            excludes += "/META-INF/license.txt"
             excludes += "/META-INF/NOTICE"
+            excludes += "/META-INF/NOTICE.txt"
+            excludes += "/META-INF/notice.txt"
         }
     }
 }
@@ -97,11 +101,10 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    // Retrofit + OkHttp - Network (prepared for future)
-    implementation(libs.retrofit.core)
-    implementation(libs.retrofit.converter.gson)
-    implementation(libs.okhttp.core)
-    implementation(libs.okhttp.logging)
+    // Google Sheets API & Google Auth
+    implementation(libs.google.api.client.android)
+    implementation(libs.google.api.services.sheets)
+    implementation(libs.google.auth.library.oauth2.http)
 
     // Coil - Image Loading
     implementation(libs.coil.compose)

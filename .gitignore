@@ -94,3 +94,6 @@ lint/
 
 # Windows
 Thumbs.db
+
+# Secret credentials
+app/src/main/res/raw/credentials.json
