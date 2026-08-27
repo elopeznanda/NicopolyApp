@@ -1,4 +1,4 @@
-# Nicopoly
+﻿# Nicopoly
 
 Aplicación Android para la consulta y gestión de información de productos y stock de Nicopoly.
 
@@ -8,7 +8,7 @@ Aplicación Android para la consulta y gestión de información de productos y s
 
 La aplicación permite buscar productos mediante su código/SKU y consultar de manera centralizada la información correspondiente a las distintas bodegas y puntos de venta.
 
-La versión **2.1** incorpora la actualización de información mediante Internet, permitiendo obtener los datos directamente desde la fuente de información de la empresa sin depender de una actualización manual mediante archivos Excel.
+La versión **2.2** moderniza la arquitectura de red migrando de un intermediario (Google Apps Script) a una conexión **directa** y segura con la **Google Sheets API v4** utilizando una Cuenta de Servicio (Service Account), mejorando el rendimiento de sincronización de datos y enriqueciendo la interfaz de usuario con encabezados fijos (Sticky Headers).
 
 ## Funcionalidades principales
 
@@ -17,39 +17,39 @@ La versión **2.1** incorpora la actualización de información mediante Interne
 - 🏬 Visualización diferenciada del stock de las distintas bodegas y tiendas.
 - 💰 Consulta de precios de venta y precios mayoristas.
 - 📊 Visualización de información detallada del producto.
-- 🌐 Actualización de información mediante Internet.
+- 🌐 Sincronización directa y segura con hojas de cálculo privadas de Google Sheets.
 - 💾 Almacenamiento local de la información mediante Room.
 - 🌙 Compatibilidad con modo claro y modo oscuro de Android.
 - ⚡ Consulta rápida de información almacenada localmente.
-- 🔄 Actualización de la base de datos local a partir de la información obtenida desde Internet.
+- 📌 Interfaz optimizada con "Sticky Headers" para no perder de vista los títulos al scrollear tablas largas de stock.
 
 ## Actualización de información
 
-La aplicación utiliza una arquitectura de actualización que permite obtener la información actualizada desde Internet.
+La aplicación utiliza una arquitectura de actualización que permite obtener la información actualizada directamente desde los servidores de Google utilizando credenciales de servicio, garantizando la privacidad de los datos internos.
 
 El flujo general de información es:
 
-```text
-Fuente de datos de la empresa
+``text
+Hoja de cálculo privada (Google Sheets)
           ↓
-Google Apps Script / API
+Google Sheets API v4 (Service Account)
           ↓
-Aplicación Android
+Aplicación Android (batchGet de pestañas Reposicion y Ubicaciones)
           ↓
-Procesamiento de datos
+Procesamiento de datos y cruce de inventario/ubicaciones
           ↓
 Base de datos Room
           ↓
 Consulta de productos y stock
           ↓
-Interfaz de usuario
-```
+Interfaz de usuario (Jetpack Compose)
+``
 
-Al seleccionar **"Actualizar información"**, la aplicación solicita los datos actualizados mediante Internet, procesa la información recibida y actualiza la base de datos local.
+Al seleccionar **"Actualizar información"**, la aplicación solicita los datos actualizados mediante Internet, procesa la información recibida (fusionando el stock y las descripciones de ubicaciones físicas) y actualiza la base de datos local.
 
 Una vez completada la actualización, las consultas realizadas por el usuario utilizan la información almacenada localmente.
 
-> La URL del servicio de datos y cualquier información de configuración sensible no se documentan públicamente en este archivo.
+> **Nota de seguridad:** Las credenciales de la Service Account (credentials.json) y cualquier información de configuración sensible no se documentan públicamente en este repositorio y deben ser inyectadas localmente antes de compilar.
 
 ## Información mostrada
 
@@ -92,7 +92,7 @@ Nicopoly está desarrollada utilizando tecnologías modernas del ecosistema Andr
 
 ### Interfaz
 
-- Jetpack Compose
+- Jetpack Compose (Incluyendo stickyHeader y Foundation API)
 - Material Design 3
 
 ### Arquitectura
@@ -109,7 +109,7 @@ Entre los componentes utilizados se encuentran:
 - Repositories
 - DTOs
 - Entidades de base de datos
-- Servicios de API
+- Servicios de Google API
 
 ### Persistencia
 
@@ -119,11 +119,11 @@ Room permite almacenar localmente la información obtenida desde Internet para q
 
 ### Comunicación con Internet
 
-- Retrofit
-- OkHttp
-- Gson
+- Google API Client Library for Java
+- Google Sheets API v4
+- Google Auth Library
 
-La aplicación utiliza estos componentes para comunicarse con el servicio de datos y convertir la información recibida en objetos utilizados internamente por la aplicación.
+La aplicación utiliza estos componentes oficiales de Google para comunicarse directamente con la hoja de cálculo de la empresa de forma segura utilizando una Cuenta de Servicio, y extraer los datos masivamente mediante operaciones atchGet.
 
 ### Inyección de dependencias
 
@@ -135,28 +135,28 @@ Hilt se utiliza para administrar las dependencias de los diferentes componentes 
 
 La arquitectura puede representarse de forma simplificada de la siguiente manera:
 
-```text
+``text
                     ┌─────────────────────┐
-                    │ Fuente de datos     │
-                    │ de la empresa       │
+                    │  Google Sheets      │
+                    │  (Hoja Privada)     │
                     └──────────┬──────────┘
                                │
                                ▼
                     ┌─────────────────────┐
-                    │ Google Apps Script  │
-                    │       / API         │
+                    │ Google Sheets API   │
+                    │  (Service Account)  │
                     └──────────┬──────────┘
                                │
                                ▼
                     ┌─────────────────────┐
-                    │     Retrofit        │
-                    │       + OkHttp      │
+                    │ GoogleSheetsService │
+                    │     (batchGet)      │
                     └──────────┬──────────┘
                                │
                                ▼
                     ┌─────────────────────┐
-                    │   ExcelImporter /   │
-                    │ procesamiento API   │
+                    │    ExcelImporter    │
+                    │ (Procesamiento)     │
                     └──────────┬──────────┘
                                │
                                ▼
@@ -181,7 +181,7 @@ La arquitectura puede representarse de forma simplificada de la siguiente manera
                     │   Jetpack Compose   │
                     │   Interfaz de UI    │
                     └─────────────────────┘
-```
+``
 
 ## Base de datos local
 
@@ -203,7 +203,7 @@ La actualización de información reemplaza la información anterior por los dat
 
 El proceso de actualización funciona de la siguiente manera:
 
-```text
+``text
 Usuario
   │
   │ "Actualizar información"
@@ -211,13 +211,13 @@ Usuario
 Aplicación
   │
   ▼
-Solicitud HTTP
+GoogleSheetsService
   │
   ▼
-API
+Google Sheets API v4
   │
   ▼
-Datos JSON
+Datos de Pestañas (batchGet)
   │
   ▼
 Conversión de datos
@@ -227,7 +227,7 @@ Room
   │
   ▼
 Información actualizada
-```
+``
 
 ## Requisitos de desarrollo
 
@@ -236,29 +236,29 @@ Para trabajar con el proyecto se requiere un entorno de desarrollo Android compa
 Se recomienda utilizar:
 
 - Android Studio
-- JDK compatible con la configuración Gradle del proyecto
+- JDK 17 (Integrado en Android Studio modernos)
 - Android SDK correspondiente a la configuración del proyecto
 - Gradle Wrapper incluido en el repositorio
 
-El proyecto incluye `gradlew` y `gradlew.bat`, por lo que se recomienda utilizar el Gradle Wrapper incluido en lugar de depender de una instalación global de Gradle.
+El proyecto incluye gradlew y gradlew.bat, por lo que se recomienda utilizar el Gradle Wrapper incluido en lugar de depender de una instalación global de Gradle.
 
 ## Instalación
 
 ### 1. Clonar el repositorio
 
-```bash
-git clone https://github.com/leonardonarocl/Nicopoly.git
-```
+``bash
+git clone https://github.com/elopeznanda/NicopolyApp.git
+``
 
 ### 2. Abrir el proyecto
 
-Abrir la carpeta `Nicopoly` desde Android Studio.
+Abrir la carpeta del proyecto desde Android Studio.
 
-### 3. Configurar el entorno Android
+### 3. Configurar credenciales y entorno
 
-Android Studio debe tener instalado el SDK requerido por el proyecto.
-
-El archivo `local.properties` es específico de cada equipo y **no forma parte del repositorio**.
+- Para que el proyecto pueda conectarse con Google Sheets, debes agregar tu archivo credentials.json en la ruta:
+  pp/src/main/res/raw/credentials.json
+- El archivo local.properties es específico de cada equipo y **no forma parte del repositorio**.
 
 ### 4. Sincronizar el proyecto
 
@@ -270,8 +270,8 @@ Seleccionar un dispositivo físico o emulador Android y ejecutar la aplicación 
 
 ## Estructura general del proyecto
 
-```text
-Nicopoly/
+``text
+NicopolyApp/
 │
 ├── app/
 │   └── src/
@@ -283,6 +283,8 @@ Nicopoly/
 │           │       └── presentation/
 │           │
 │           └── res/
+│               └── raw/
+│                   └── credentials.json (ignorado)
 │
 ├── gradle/
 ├── build.gradle.kts
@@ -292,7 +294,7 @@ Nicopoly/
 ├── gradlew.bat
 ├── .gitignore
 └── README.md
-```
+``
 
 ## Control de versiones
 
@@ -300,33 +302,24 @@ El proyecto utiliza Git para mantener un historial de cambios y permitir la recu
 
 La versión actual documentada en este repositorio es:
 
-**Nicopoly 2.1**
+**Nicopoly 2.2**
 
 Se recomienda mantener cada versión estable identificada mediante tags de Git.
-
-Ejemplo:
-
-```text
-v2.1
-v2.2
-v2.3
-v3.0
-```
-
-Esto permite identificar claramente las versiones utilizadas y recuperar una versión anterior cuando sea necesario.
 
 ## Seguridad y configuración
 
 Los archivos de configuración específicos de cada equipo no deben almacenarse en el repositorio.
 
-Entre los archivos excluidos mediante `.gitignore` se encuentran configuraciones locales y archivos generados por Android Studio y Gradle.
+Entre los archivos excluidos mediante .gitignore se encuentran configuraciones locales y archivos generados por Android Studio y Gradle.
 
 No se deben almacenar en Git:
 
+- **pp/src/main/res/raw/credentials.json** (Llaves de la cuenta de servicio de Google Sheets).
 - Contraseñas.
 - Tokens privados.
 - Claves privadas.
-- Keystores.
+- Keystores (ej. 
+icopoly_key.jks).
 - Credenciales.
 - Configuraciones locales.
 - Información confidencial de la empresa.
@@ -335,10 +328,10 @@ La configuración del servicio de datos debe mantenerse de acuerdo con las polí
 
 ## Estado del proyecto
 
-**Versión:** 2.1  
+**Versión:** 2.2  
 **Estado:** Estable / Operativa
 
-La versión 2.1 corresponde a una versión funcional de la aplicación con actualización de información mediante Internet y almacenamiento local mediante Room.
+La versión 2.2 corresponde a una versión funcional de la aplicación con integración directa vía Google Sheets API, almacenamiento local mediante Room y mejoras en la Interfaz de Usuario (Sticky Headers).
 
 ## Mantenimiento
 
@@ -349,14 +342,15 @@ Para realizar modificaciones en el proyecto se recomienda:
 3. Probar la aplicación en Android Studio.
 4. Confirmar que la aplicación continúa funcionando correctamente.
 5. Crear un commit descriptivo.
-6. Fusionar los cambios a `main` cuando estén validados.
+6. Fusionar los cambios a main cuando estén validados.
 7. Crear un nuevo tag para cada versión estable.
 
 ## Historial de versiones
 
 | Versión | Estado | Descripción |
 |---|---|---|
-| 2.1 | Estable | Versión actual del proyecto |
+| 2.2 | Estable | Integración directa con Google Sheets API (Service Account) y UI Sticky Header |
+| 2.1 | Estable | Actualización de información mediante Internet (Google Apps Script) |
 
 ## Licencia
 
@@ -368,4 +362,4 @@ El código fuente, la aplicación y los componentes desarrollados específicamen
 
 **Nicopoly — Aplicación Android de consulta de productos y stock**
 
-Versión 2.1
+Versión 2.2
