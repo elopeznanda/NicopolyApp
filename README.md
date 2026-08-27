@@ -1,4 +1,4 @@
-﻿# Nicopoly
+# Nicopoly
 
 Aplicación Android para la consulta y gestión de información de productos y stock de Nicopoly.
 
@@ -29,7 +29,7 @@ La aplicación utiliza una arquitectura de actualización que permite obtener la
 
 El flujo general de información es:
 
-``text
+```text
 Hoja de cálculo privada (Google Sheets)
           ↓
 Google Sheets API v4 (Service Account)
@@ -43,13 +43,13 @@ Base de datos Room
 Consulta de productos y stock
           ↓
 Interfaz de usuario (Jetpack Compose)
-``
+```
 
 Al seleccionar **"Actualizar información"**, la aplicación solicita los datos actualizados mediante Internet, procesa la información recibida (fusionando el stock y las descripciones de ubicaciones físicas) y actualiza la base de datos local.
 
 Una vez completada la actualización, las consultas realizadas por el usuario utilizan la información almacenada localmente.
 
-> **Nota de seguridad:** Las credenciales de la Service Account (credentials.json) y cualquier información de configuración sensible no se documentan públicamente en este repositorio y deben ser inyectadas localmente antes de compilar.
+> **Nota de seguridad:** Las credenciales de la Service Account (`credentials.json`) y cualquier información de configuración sensible no se documentan públicamente en este repositorio y deben ser inyectadas localmente antes de compilar.
 
 ## Información mostrada
 
@@ -92,7 +92,7 @@ Nicopoly está desarrollada utilizando tecnologías modernas del ecosistema Andr
 
 ### Interfaz
 
-- Jetpack Compose (Incluyendo stickyHeader y Foundation API)
+- Jetpack Compose (Incluyendo `stickyHeader` y Foundation API)
 - Material Design 3
 
 ### Arquitectura
@@ -123,7 +123,7 @@ Room permite almacenar localmente la información obtenida desde Internet para q
 - Google Sheets API v4
 - Google Auth Library
 
-La aplicación utiliza estos componentes oficiales de Google para comunicarse directamente con la hoja de cálculo de la empresa de forma segura utilizando una Cuenta de Servicio, y extraer los datos masivamente mediante operaciones atchGet.
+La aplicación utiliza estos componentes oficiales de Google para comunicarse directamente con la hoja de cálculo de la empresa de forma segura utilizando una Cuenta de Servicio, y extraer los datos masivamente mediante operaciones `batchGet`.
 
 ### Inyección de dependencias
 
@@ -135,7 +135,7 @@ Hilt se utiliza para administrar las dependencias de los diferentes componentes 
 
 La arquitectura puede representarse de forma simplificada de la siguiente manera:
 
-``text
+```text
                     ┌─────────────────────┐
                     │  Google Sheets      │
                     │  (Hoja Privada)     │
@@ -181,7 +181,7 @@ La arquitectura puede representarse de forma simplificada de la siguiente manera
                     │   Jetpack Compose   │
                     │   Interfaz de UI    │
                     └─────────────────────┘
-``
+```
 
 ## Base de datos local
 
@@ -203,7 +203,7 @@ La actualización de información reemplaza la información anterior por los dat
 
 El proceso de actualización funciona de la siguiente manera:
 
-``text
+```text
 Usuario
   │
   │ "Actualizar información"
@@ -227,7 +227,7 @@ Room
   │
   ▼
 Información actualizada
-``
+```
 
 ## Requisitos de desarrollo
 
@@ -240,15 +240,15 @@ Se recomienda utilizar:
 - Android SDK correspondiente a la configuración del proyecto
 - Gradle Wrapper incluido en el repositorio
 
-El proyecto incluye gradlew y gradlew.bat, por lo que se recomienda utilizar el Gradle Wrapper incluido en lugar de depender de una instalación global de Gradle.
+El proyecto incluye `gradlew` y `gradlew.bat`, por lo que se recomienda utilizar el Gradle Wrapper incluido en lugar de depender de una instalación global de Gradle.
 
 ## Instalación
 
 ### 1. Clonar el repositorio
 
-``bash
+```bash
 git clone https://github.com/elopeznanda/NicopolyApp.git
-``
+```
 
 ### 2. Abrir el proyecto
 
@@ -256,9 +256,9 @@ Abrir la carpeta del proyecto desde Android Studio.
 
 ### 3. Configurar credenciales y entorno
 
-- Para que el proyecto pueda conectarse con Google Sheets, debes agregar tu archivo credentials.json en la ruta:
-  pp/src/main/res/raw/credentials.json
-- El archivo local.properties es específico de cada equipo y **no forma parte del repositorio**.
+- Para que el proyecto pueda conectarse con Google Sheets, debes agregar tu archivo `credentials.json` en la ruta:
+  `app/src/main/res/raw/credentials.json`
+- El archivo `local.properties` es específico de cada equipo y **no forma parte del repositorio**.
 
 ### 4. Sincronizar el proyecto
 
@@ -270,7 +270,7 @@ Seleccionar un dispositivo físico o emulador Android y ejecutar la aplicación 
 
 ## Estructura general del proyecto
 
-``text
+```text
 NicopolyApp/
 │
 ├── app/
@@ -294,7 +294,7 @@ NicopolyApp/
 ├── gradlew.bat
 ├── .gitignore
 └── README.md
-``
+```
 
 ## Control de versiones
 
@@ -310,16 +310,15 @@ Se recomienda mantener cada versión estable identificada mediante tags de Git.
 
 Los archivos de configuración específicos de cada equipo no deben almacenarse en el repositorio.
 
-Entre los archivos excluidos mediante .gitignore se encuentran configuraciones locales y archivos generados por Android Studio y Gradle.
+Entre los archivos excluidos mediante `.gitignore` se encuentran configuraciones locales y archivos generados por Android Studio y Gradle.
 
 No se deben almacenar en Git:
 
-- **pp/src/main/res/raw/credentials.json** (Llaves de la cuenta de servicio de Google Sheets).
+- **`app/src/main/res/raw/credentials.json`** (Llaves de la cuenta de servicio de Google Sheets).
 - Contraseñas.
 - Tokens privados.
 - Claves privadas.
-- Keystores (ej. 
-icopoly_key.jks).
+- Keystores (ej. `nicopoly_key.jks`).
 - Credenciales.
 - Configuraciones locales.
 - Información confidencial de la empresa.
@@ -342,7 +341,7 @@ Para realizar modificaciones en el proyecto se recomienda:
 3. Probar la aplicación en Android Studio.
 4. Confirmar que la aplicación continúa funcionando correctamente.
 5. Crear un commit descriptivo.
-6. Fusionar los cambios a main cuando estén validados.
+6. Fusionar los cambios a `main` cuando estén validados.
 7. Crear un nuevo tag para cada versión estable.
 
 ## Historial de versiones
